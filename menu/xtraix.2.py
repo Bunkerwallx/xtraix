@@ -1,0 +1,126 @@
+import os
+import re
+import random
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+from colorama import Fore, Style, init
+import pyfiglet
+
+# Inicializar colorama para el color de la terminal
+init(autoreset=True)
+
+# Lista de 15 agentes de usuario
+userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36 (KHTML, like Gecko) Chrome/58.0.3039.10 Safari/537.3',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+    'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:42.0) Gecko/20100101 Firefox/42.0',
+    'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:39.0) Gecko/20100101 Firefox/39.0',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36 Edge/74.0.1371.47',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:85.0) Gecko/20100101 Firefox/85.0',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36',
+]
+
+# Función para mostrar un banner con pyfiglet
+def print_figlet(text, font='slant', color=Fore.BLUE):
+    figlet_text = pyfiglet.Figlet(font=font).renderText(text)
+    ancho_consola = os.get_terminal_size().columns
+    for linea in figlet_text.splitlines():
+        print(color + linea.center(ancho_consola) + Style.RESET_ALL)
+
+# Función para extraer URLs de enlaces de la página
+def extraer_urls():
+    print_figlet("\nBunkerWallx", font='block', color=Fore.CYAN)
+    url_input = input(Fore.WHITE + f"\n\nIngresa la URL de la página: ").strip()
+    
+    try:
+        # Seleccionar un User-Agent aleatorio
+        user_agent = random.choice(userAgents)
+        headers = {'User-Agent': user_agent}
+        
+        # Solicitar con redirecciones activadas y el User-Agent aleatorio
+        respuesta = requests.get(url_input, headers=headers, allow_redirects=True)
+        respuesta.raise_for_status()  # Asegurarse de que no haya errores en la respuesta
+        
+        # Mostrar la URL final después de redirecciones
+        print(f"Redirigido a: {respuesta.url}")
+        
+        soup = BeautifulSoup(respuesta.text, 'html.parser')
+        enlaces = soup.find_all('a', href=True)
+        
+        carpeta_usuario = os.path.expanduser('~')
+        ruta_resultados = os.path.join(carpeta_usuario, 'resultados', 'urls_extraidas.txt')
+        os.makedirs(os.path.dirname(ruta_resultados), exist_ok=True)
+        
+        with open(ruta_resultados, 'w') as archivo:
+            print(Fore.CYAN + f"\nURLs encontradas:")
+            for contador, enlace in enumerate(enlaces, start=1):
+                url_completa = urljoin(url_input, enlace['href'])
+                print(Fore.LIGHTGREEN_EX + f"{contador}: {Fore.WHITE}***{Fore.LIGHTYELLOW_EX} {url_completa} {Fore.WHITE}***")
+                archivo.write(f"{contador}: {url_completa}\n")
+        
+        print(f"\nResultados guardados en {ruta_resultados}")
+    
+    except requests.exceptions.RequestException as e:
+        print(f"Error al acceder a la página: {e}")
+
+# Función para clasificar URLs multimedia
+def obtener_urls_multimedia(url):
+    try:
+        # Seleccionar un User-Agent aleatorio
+        user_agent = random.choice(userAgents)
+        headers = {'User-Agent': user_agent}
+        
+        # Solicitar con redirecciones activadas y el User-Agent aleatorio
+        response = requests.get(url, headers=headers, allow_redirects=True)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        recursos = {
+            "imagenes": [],
+            "videos": [],
+            "audios": [],
+            "documentos": [],
+            "otros": []
+        }
+        
+        for tag in soup.find_all(['img', 'a', 'video', 'audio', 'source']):
+            recurso_url = tag.get('src') or tag.get('href')
+            if recurso_url:
+                if re.search(r'\.(jpg|jpeg|png|gif|svg)$', recurso_url, re.IGNORECASE):
+                    recursos["imagenes"].append(recurso_url)
+                elif re.search(r'\.(mp4|webm|avi)$', recurso_url, re.IGNORECASE):
+                    recursos["videos"].append(recurso_url)
+                elif re.search(r'\.(mp3|wav|ogg)$', recurso_url, re.IGNORECASE):
+                    recursos["audios"].append(recurso_url)
+                elif re.search(r'\.(pdf|docx|txt)$', recurso_url, re.IGNORECASE):
+                    recursos["documentos"].append(recurso_url)
+                else:
+                    recursos["otros"].append(recurso_url)
+        
+        return recursos
+    except requests.exceptions.RequestException as e:
+        print(f"Error al acceder a la URL: {e}")
+        return None
+
+# Ejecución del script interactivo
+if __name__ == "__main__":
+    extraer_urls()
+
+    # Solicitar al usuario ingresar una URL para análisis multimedia
+    url = input("INGRESA UNA URL para extraer contenido multimedia: ")
+    recursos = obtener_urls_multimedia(url)
+
+    if recursos:
+        for tipo, urls in recursos.items():
+            print(f"{tipo.capitalize()}: {len(urls)} encontrados")
+            for recurso in urls:
+                print(f"  - {recurso}")
