@@ -9,6 +9,12 @@ import pyfiglet
 
 # Inicializar colorama para el color de la terminal
 init(autoreset=True)
+text='BunkerWallx'
+def print_figlet(text, font='slant', color=Fore.BLUE):
+    figlet_text = pyfiglet.Figlet(font=font).renderText(text)
+    ancho_consola = os.get_terminal_size().columns
+    for linea in figlet_text.splitlines():
+        print(color + linea.center(ancho_consola) + Style.RESET_ALL)
 
 # Lista de agentes de usuario
 userAgents = [
